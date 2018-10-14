@@ -113,6 +113,29 @@ def insert_gw_status(config, gateway_id, status):
         logging.error("Error inserting data into InfluxDB: %s" % str(err))
 
 
+def insert_gw_packet_count(config, gateway_id, rx_count, tx_count):
+    try:
+        influx_client = InfluxDBClient(config.get('influxdb_host'),
+                                       config.get('influxdb_port'),
+                                       config.get('influxdb_user'),
+                                       config.get('influxdb_pass'),
+                                       config.get('influxdb_name'))
+
+        db_json = [{
+            "measurement": "gateway_packet_count",
+            "tags": {"device_id": gateway_id},
+            "time": datetime.datetime.now(),
+            "fields": {"rx": rx_count,
+                       "tx": tx_count}
+            }]
+
+        logging.info("Sending data to InfluxDB: %s" % db_json)
+        influx_client.write_points(db_json)
+
+    except Exception as err:
+        logging.error("Error inserting data into InfluxDB: %s" % str(err))
+
+
 def run_gateway_check():
     logging.info("Loading configuration file")
     config = get_config()
@@ -133,6 +156,11 @@ def run_gateway_check():
         else:
             logging.info("Gateway has been seen recently, marking as online.")
             insert_gw_status(config, gateway.get('ttn_id'), 1)
+
+        insert_gw_packet_count(config,
+                               gateway.get('ttn_id'),
+                               gw_data.get('rx_ok'),
+                               0)
 
 
 if __name__ == '__main__':
