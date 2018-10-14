@@ -2,7 +2,10 @@ import os
 import sys
 import json
 import logging
+import datetime
 import requests
+from dateutil.parser import parse as dt_parse
+from influxdb import InfluxDBClient
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
@@ -18,6 +21,7 @@ def get_config():
         config_file = os.environ['CONFIG_FILE']
         with open(config_file, 'r') as fhandle:
             config_data = json.load(fhandle)
+            return config_data
 
     except json.decoder.JSONDecodeError:
         logging.error("Configuration file does not appear to be "
@@ -87,9 +91,54 @@ def get_noc_data(gateway_id):
                       "%s" % str(err))
 
 
+def insert_gw_status(config, gateway_id, status):
+    try:
+        influx_client = InfluxDBClient(config.get('influxdb_host'),
+                                       config.get('influxdb_port'),
+                                       config.get('influxdb_user'),
+                                       config.get('influxdb_pass'),
+                                       config.get('influxdb_name'))
+
+        db_json = [{
+            "measurement": "gateways",
+            "tags": {"device_id": gateway_id},
+            "time": datetime.datetime.now(),
+            "fields": {"status": status}
+            }]
+
+        logging.info("Sending data to InfluxDB: %s" % db_json)
+        influx_client.write_points(db_json)
+
+    except Exception as err:
+        logging.error("Error inserting data into InfluxDB: %s" % str(err))
+
+
+def insert_gw_packet_count(config, gateway_id, rx_count, tx_count):
+    try:
+        influx_client = InfluxDBClient(config.get('influxdb_host'),
+                                       config.get('influxdb_port'),
+                                       config.get('influxdb_user'),
+                                       config.get('influxdb_pass'),
+                                       config.get('influxdb_name'))
+
+        db_json = [{
+            "measurement": "gateway_packet_count",
+            "tags": {"device_id": gateway_id},
+            "time": datetime.datetime.now(),
+            "fields": {"rx": rx_count,
+                       "tx": tx_count}
+            }]
+
+        logging.info("Sending data to InfluxDB: %s" % db_json)
+        influx_client.write_points(db_json)
+
+    except Exception as err:
+        logging.error("Error inserting data into InfluxDB: %s" % str(err))
+
+
 def run_gateway_check():
     logging.info("Loading configuration file")
-    get_config()
+    config = get_config()
     logging.info("Fetching gateways from inventory")
     gateways = get_gateways_from_inventory()
 
@@ -98,6 +147,20 @@ def run_gateway_check():
         logging.info("Checking %s" % gateway.get('name'))
         gw_data = get_noc_data(gateway.get('ttn_id'))
         logging.info("Got NOC data for gateway: %s" % gw_data)
+        utc_recent = datetime.datetime.utcnow().replace(tzinfo=None) - datetime.timedelta(minutes=10)
+        utc_gw = dt_parse(gw_data.get('timestamp')).replace(tzinfo=None)
+
+        if utc_gw < utc_recent:
+            logging.info("Gateway has not been seen recently, marking as offline.")
+            insert_gw_status(config, gateway.get('ttn_id'), 0)
+        else:
+            logging.info("Gateway has been seen recently, marking as online.")
+            insert_gw_status(config, gateway.get('ttn_id'), 1)
+
+        insert_gw_packet_count(config,
+                               gateway.get('ttn_id'),
+                               gw_data.get('rx_ok'),
+                               0)
 
 
 if __name__ == '__main__':
