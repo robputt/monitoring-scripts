@@ -2,7 +2,9 @@ import os
 import sys
 import json
 import logging
+import datetime
 import requests
+from dateutil.parser import parse as dt_parse
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
@@ -98,6 +100,13 @@ def run_gateway_check():
         logging.info("Checking %s" % gateway.get('name'))
         gw_data = get_noc_data(gateway.get('ttn_id'))
         logging.info("Got NOC data for gateway: %s" % gw_data)
+        utc_recent = datetime.datetime.utcnow().replace(tzinfo=None) - datetime.timedelta(minutes=10)
+        utc_gw = dt_parse(gw_data.get('timestamp')).replace(tzinfo=None)
+
+        if utc_gw < utc_recent:
+            logging.info("Gateway has not been seen recently, marking as offline.")
+        else:
+            logging.info("Gateway has been seen recently, marking as online.")
 
 
 if __name__ == '__main__':
