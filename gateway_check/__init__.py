@@ -99,12 +99,11 @@ def insert_gw_status(config, gateway_id, status):
                                        config.get('influxdb_pass'),
                                        config.get('influxdb_name'))
 
-        db_json = [{
-            "measurement": "gateways",
-            "tags": {"device_id": gateway_id},
-            "time": datetime.datetime.now(),
-            "fields": {"status": status}
-            }]
+        db_json = [{"measurement": "gateways",
+                    "tags": {"device_id": gateway_id},
+                    "time": datetime.datetime.now(),
+                    "fields": {"status": status}
+                    }]
 
         logging.info("Sending data to InfluxDB: %s" % db_json)
         influx_client.write_points(db_json)
@@ -121,13 +120,12 @@ def insert_gw_packet_count(config, gateway_id, rx_count, tx_count):
                                        config.get('influxdb_pass'),
                                        config.get('influxdb_name'))
 
-        db_json = [{
-            "measurement": "gateway_packet_count",
-            "tags": {"device_id": gateway_id},
-            "time": datetime.datetime.now(),
-            "fields": {"rx": rx_count,
-                       "tx": tx_count}
-            }]
+        db_json = [{"measurement": "gateway_packet_count",
+                    "tags": {"device_id": gateway_id},
+                    "time": datetime.datetime.now(),
+                    "fields": {"rx": rx_count,
+                               "tx": tx_count}
+                    }]
 
         logging.info("Sending data to InfluxDB: %s" % db_json)
         influx_client.write_points(db_json)
@@ -147,11 +145,13 @@ def run_gateway_check():
         logging.info("Checking %s" % gateway.get('name'))
         gw_data = get_noc_data(gateway.get('ttn_id'))
         logging.info("Got NOC data for gateway: %s" % gw_data)
-        utc_recent = datetime.datetime.utcnow().replace(tzinfo=None) - datetime.timedelta(minutes=10)
+        utc_now = datetime.datetime.utcnow().replace(tzinfo=None)
+        utc_recent = utc_now - datetime.timedelta(minutes=10)
         utc_gw = dt_parse(gw_data.get('timestamp')).replace(tzinfo=None)
 
         if utc_gw < utc_recent:
-            logging.info("Gateway has not been seen recently, marking as offline.")
+            logging.info("Gateway has not been seen recently, marking as "
+                         " offline.")
             insert_gw_status(config, gateway.get('ttn_id'), 0)
         else:
             logging.info("Gateway has been seen recently, marking as online.")
