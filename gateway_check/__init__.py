@@ -142,25 +142,30 @@ def run_gateway_check():
 
     logging.info("Checking network connection data for gateways...")
     for gateway in gateways:
-        logging.info("Checking %s" % gateway.get('name'))
-        gw_data = get_noc_data(gateway.get('ttn_id'))
-        logging.info("Got NOC data for gateway: %s" % gw_data)
-        utc_now = datetime.datetime.utcnow().replace(tzinfo=None)
-        utc_recent = utc_now - datetime.timedelta(minutes=10)
-        utc_gw = dt_parse(gw_data.get('timestamp')).replace(tzinfo=None)
+        try:
+            logging.info("Checking %s" % gateway.get('name'))
+            gw_data = get_noc_data(gateway.get('ttn_id'))
+            logging.info("Got NOC data for gateway: %s" % gw_data)
+            utc_now = datetime.datetime.utcnow().replace(tzinfo=None)
+            utc_recent = utc_now - datetime.timedelta(minutes=10)
+            utc_gw = dt_parse(gw_data.get('timestamp')).replace(tzinfo=None)
 
-        if utc_gw < utc_recent:
-            logging.info("Gateway has not been seen recently, marking as "
-                         " offline.")
-            insert_gw_status(config, gateway.get('ttn_id'), 0)
-        else:
-            logging.info("Gateway has been seen recently, marking as online.")
-            insert_gw_status(config, gateway.get('ttn_id'), 1)
+            if utc_gw < utc_recent:
+                logging.info("Gateway has not been seen recently, marking as "
+                             " offline.")
+                insert_gw_status(config, gateway.get('ttn_id'), 0)
+            else:
+                logging.info("Gateway has been seen recently, marking as "
+                             "online.")
+                insert_gw_status(config, gateway.get('ttn_id'), 1)
 
-        insert_gw_packet_count(config,
-                               gateway.get('ttn_id'),
-                               gw_data.get('rx_ok'),
-                               0)
+            insert_gw_packet_count(config,
+                                   gateway.get('ttn_id'),
+                                   gw_data.get('rx_ok'),
+                                   0)
+
+        except Exception as err:
+            logging.error("Error occured dealing with gateway: %s" % str(err))
 
 
 if __name__ == '__main__':
