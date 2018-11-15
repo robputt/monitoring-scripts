@@ -162,7 +162,7 @@ def run_gateway_check():
             insert_gw_packet_count(config,
                                    gateway.get('ttn_id'),
                                    gw_data.get('rx_ok'),
-                                   0)
+                                   gw_data.get('tx_in', 0))
 
         except Exception as err:
             logging.error("Error occured dealing with gateway: %s" % str(err))
